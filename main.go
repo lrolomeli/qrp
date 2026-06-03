@@ -106,33 +106,24 @@ type DashboardData struct {
 }
 
 func main() {
-	dbPath := getEnv("DB_PATH", "/data/qrp.db")
-	codesPath := getEnv("CODES_PATH", "/data/codes.json")
+	redirectURL := getEnv("REDIRECT_URL", "https://ejemplo.com")
 	port := getEnv("PORT", "8080")
 
-	store, err := NewStore(dbPath)
+	store, err := NewStore(getEnv("DB_PATH", "/data/qrp.db"))
 	if err != nil {
 		log.Fatalf("init store: %v", err)
 	}
 	defer store.Close()
 
-	if err := store.LoadCodes(codesPath); err != nil {
-		log.Fatalf("load codes: %v", err)
-	}
-
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /menu/{code}", func(w http.ResponseWriter, r *http.Request) {
-		code := r.PathValue("code")
-		dest, ok := store.ResolveCode(code)
-		if !ok {
-			http.Error(w, "Code not found", http.StatusNotFound)
+	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
 			return
 		}
-
-		go store.RecordClick(code, dest, r.RemoteAddr, r.UserAgent(), r.Referer())
-
-		http.Redirect(w, r, dest, http.StatusFound)
+		go store.RecordClick("root", redirectURL, r.RemoteAddr, r.UserAgent(), r.Referer())
+		http.Redirect(w, r, redirectURL, http.StatusFound)
 	})
 
 	mux.HandleFunc("GET /api/dashboard", func(w http.ResponseWriter, r *http.Request) {
@@ -155,7 +146,7 @@ func main() {
 		}
 
 		data := DashboardData{
-			CodeCount:    store.CodeCount(),
+			CodeCount:    1,
 			TotalClicks:  totalClicks,
 			ClicksByCode: clicksByCode,
 			RecentClicks: recentClicks,
@@ -171,11 +162,7 @@ func main() {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/api/dashboard", http.StatusFound)
-	})
-
-	log.Printf("QR backend listening on :%s", port)
+	log.Printf("QR backend listening on :%s — redirecting to %s", port, redirectURL)
 	log.Fatal(http.ListenAndServe(":"+port, mux))
 }
 

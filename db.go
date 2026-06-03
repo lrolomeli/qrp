@@ -2,19 +2,15 @@ package main
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 
 	_ "modernc.org/sqlite"
 )
 
 type Store struct {
-	db    *sql.DB
-	mu    sync.RWMutex
-	codes map[string]string
+	db *sql.DB
 }
 
 func NewStore(dbPath string) (*Store, error) {
@@ -45,39 +41,11 @@ func NewStore(dbPath string) (*Store, error) {
 		return nil, fmt.Errorf("create table: %w", err)
 	}
 
-	return &Store{
-		db:    db,
-		codes: make(map[string]string),
-	}, nil
+	return &Store{db: db}, nil
 }
 
 func (s *Store) Close() error {
 	return s.db.Close()
-}
-
-func (s *Store) LoadCodes(path string) error {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("read codes file: %w", err)
-	}
-
-	var codes map[string]string
-	if err := json.Unmarshal(data, &codes); err != nil {
-		return fmt.Errorf("parse codes: %w", err)
-	}
-
-	s.mu.Lock()
-	s.codes = codes
-	s.mu.Unlock()
-
-	return nil
-}
-
-func (s *Store) ResolveCode(code string) (string, bool) {
-	s.mu.RLock()
-	dest, ok := s.codes[code]
-	s.mu.RUnlock()
-	return dest, ok
 }
 
 func (s *Store) RecordClick(code, destURL, ip, ua, referer string) error {
@@ -143,8 +111,4 @@ func (s *Store) GetRecentClicks(limit int) ([]Click, error) {
 	return clicks, rows.Err()
 }
 
-func (s *Store) CodeCount() int {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return len(s.codes)
-}
+
