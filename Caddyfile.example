@@ -1,5 +1,0 @@
-# Agregar en infra-proxy/config/Caddyfile:
-lrlpapp.store {
-    tls internal
-    reverse_proxy qrp-backend:8080
-}
