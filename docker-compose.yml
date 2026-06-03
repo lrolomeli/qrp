@@ -1,0 +1,25 @@
+services:
+  backend:
+    build: .
+    restart: unless-stopped
+    container_name: qrp-backend
+    environment:
+      PORT: "8080"
+    volumes:
+      - ./codes.json:/data/codes.json:ro
+      - qrp-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - proxy-net
+
+volumes:
+  qrp-data:
+
+networks:
+  proxy-net:
+    external: true
